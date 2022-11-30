@@ -1,41 +1,29 @@
 import math
+import sys
 
-# def get_metadata(path):
-#     f = open(path, 'r')
-#     s = ''
-#     start_encoded = 0
-#     while (ch := f.read(1)) != '\n':
-#         s += ch
-#         start_encoded += 1
-#     bitlength = int(s)
-#     f.close()
-#     return bitlength, start_encoded + 1 # take newline byte into account
 
-# print(get_metadata('test.bin'))
-
-def read(path):
-    # bitlength, start_encoded = get_metadata(path)
+def read_encoded(path):
     f = open(path, 'rb')
     header = f.readline().decode('ascii')
-    assert header == 'LosslessTextComp\n'
+    assert header[:-1] == 'LosslessTextComp'
     
-    bitlength = int(f.readline().decode('ascii'))
-
     # read the encoded text (sequence of huffman codes)
+    bitlength = int(f.readline().decode('ascii'))
     encoded_bytes = f.read(math.ceil(bitlength / 8))
     bitstring = encoded_bytes_to_bitstring(encoded_bytes, bitlength)
-
+    
     # get the codes dictionary
     f.read(1) # newline before dictionary
     codes = {}
     codelength_max = -1
-    while (line := f.readline().decode('ascii')):
-        ch = line[0]
-        code = line[2:]
+    while (ch := f.read(1).decode('ascii')): # we can't just readlines because we can encode newline characters
+        f.read(1) # space
+        code = f.readline()[:-1].decode('ascii')
         codes[ch] = code
         codelength_max = max(codelength_max, len(code))
     f.close()
     return bitstring, bitlength, codes, codelength_max
+
 
 def encoded_bytes_to_bitstring(encoded, bitlength):
     bitstring = ''
@@ -51,11 +39,11 @@ def encoded_bytes_to_bitstring(encoded, bitlength):
     assert len(bitstring) == bitlength
     return bitstring
 
+
 def table_from_codes(codes, codelength_max):
     out = [None for _ in range(codelength_max)]
     start_i = 0
     # assume that dict (which is sorted by insertion order) has ascending keys, this allows index into table to be correct
-    breakpoint()
     for ch, code in codes.items():
         assert codelength_max >= len(code)
         count = 2 ** (codelength_max - len(code))
@@ -64,20 +52,38 @@ def table_from_codes(codes, codelength_max):
         start_i = end_i
     return out
 
-def decode(bitstring, table):
+
+def decode(bitstring, table, codelength_max):
     read_size = int(math.log2(len(table)))
     bitstring_index = 0
     text = ''
+    def padzeros(s, l): return s + (l - len(s)) * '0'
     while (bitstring_index < len(bitstring)):
         bitstring_slice = bitstring[bitstring_index : bitstring_index + read_size]
-        tup = table[int(bitstring_slice, 2)]
+        print(bitstring_slice)
+        tup = table[int(padzeros(bitstring_slice, codelength_max), 2)]
         text += tup[0]
         bitstring_index += tup[1]
     return text
 
-bitstring, bitlength, codes, codelength_max = read('lorem.bin')
-table = table_from_codes(codes, codelength_max)
-print(table)
-print(bitstring)
-text = decode(bitstring, table)
-print(text)
+
+def write_decoded(path_encoded, path_decoded):
+    bitstring, bitlength, codes, codelength_max = read_encoded(path_encoded)
+    table = table_from_codes(codes, codelength_max)
+    text = decode(bitstring, table, codelength_max)
+    f = open(path_decoded, 'w')
+    f.write(text)
+
+
+# print(codes)
+# table = table_from_codes(codes, codelength_max)
+# print(table)
+# print(bitstring)
+# text = decode(bitstring, table, codelength_max)
+# print(text)
+
+def main():
+    assert len(sys.argv) == 3
+    write_decoded(sys.argv[1], sys.argv[2])
+
+main()
