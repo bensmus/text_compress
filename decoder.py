@@ -75,13 +75,6 @@ def write_decoded(path_encoded, path_decoded):
     f.write(text)
 
 
-# print(codes)
-# table = table_from_codes(codes, codelength_max)
-# print(table)
-# print(bitstring)
-# text = decode(bitstring, table, codelength_max)
-# print(text)
-
 def main():
     assert len(sys.argv) == 3
     write_decoded(sys.argv[1], sys.argv[2])
