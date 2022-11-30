@@ -2,11 +2,12 @@ import queue
 import sys
 
 class Node:
-    def __init__(self, ch, count, left, right):
+    def __init__(self, ch, count, height, left, right):
         self.ch = ch
         self.count = count
         self.left = left
         self.right = right
+        self.height = height
     def __lt__(self, other):
         return self.count < other.count
 
@@ -29,11 +30,11 @@ def huff_tree(charcount):
     pq = queue.PriorityQueue()
     nodecount = len(charcount.items())
     for ch, count in charcount.items():
-        pq.put(Node(ch, count, None, None))
+        pq.put(Node(ch, count, 0, None, None))
     for _ in range(nodecount - 1):
         node_a = pq.get()
         node_b = pq.get()
-        node_combined = Node(node_a.ch + node_b.ch, node_a.count + node_b.count, node_a, node_b)
+        node_combined = Node(node_a.ch + node_b.ch, node_a.count + node_b.count, max(node_a.height, node_b.height) + 1, node_a, node_b)
         pq.put(node_combined)
     return pq.get()
 
@@ -41,17 +42,14 @@ def codes_from_tree(root):
     codes = dict()
     current_node = root
     current_code = ''
-    codelength_max = -1
     def fill_codes(node, code):
         if node:
             if len(node.ch) == 1:
                 codes[node.ch] = code
-                nonlocal codelength_max
-                codelength_max = max(codelength_max, len(code))
             fill_codes(node.left, code + '0')
             fill_codes(node.right, code + '1')
     fill_codes(current_node, current_code)
-    return codes, codelength_max
+    return codes, root.height
 
 def table_from_codes(codes, codelength_max):
     out = [None for _ in range(codelength_max)]
@@ -84,7 +82,7 @@ def encode(text, codes):
     return bytes(nums), len(bitstring)
 
 def write(path, encoded_bitlength, encoded_bytes, table_bytes):
-    f = open(path, 'xb') # wb necessary to write bytes, have to put .encode(blah) everywhere
+    f = open(path, 'wb') # wb necessary to write bytes, have to put .encode(blah) everywhere
     f.write(f'{encoded_bitlength}\n'.encode('ascii'))
     f.write(encoded_bytes)
     f.write(table_bytes)
