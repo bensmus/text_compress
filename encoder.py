@@ -1,6 +1,5 @@
 import queue
-
-codes = {'d': '0', 'c': '100', 'a': '101', 'b': '11'} # convert to array with tuples ('a', 3), ('b', 2), ('c', 3), ('d', 1)
+import sys
 
 class Node:
     def __init__(self, ch, count, left, right):
@@ -11,9 +10,11 @@ class Node:
     def __lt__(self, other):
         return self.count < other.count
 
-def to_string(path):
+def read(path):
     f = open(path, 'r')
-    return f.read(-1)
+    s = f.read(-1)
+    f.close()
+    return s
 
 def charcount(string):
     counts = dict()
@@ -24,7 +25,7 @@ def charcount(string):
             counts[ch] = 1
     return counts
 
-def to_tree(charcount):
+def huff_tree(charcount):
     pq = queue.PriorityQueue()
     nodecount = len(charcount.items())
     for ch, count in charcount.items():
@@ -36,31 +37,35 @@ def to_tree(charcount):
         pq.put(node_combined)
     return pq.get()
 
-def to_codes(root):
+def codes_from_tree(root):
     codes = dict()
     current_node = root
     current_code = ''
+    codelength_max = -1
     def fill_codes(node, code):
         if node:
             if len(node.ch) == 1:
                 codes[node.ch] = code
+                nonlocal codelength_max
+                codelength_max = max(codelength_max, len(code))
             fill_codes(node.left, code + '0')
             fill_codes(node.right, code + '1')
     fill_codes(current_node, current_code)
-    return codes
+    return codes, codelength_max
 
-def to_table(codes, depth):
-    out = [None for _ in range(depth)]
+def table_from_codes(codes, codelength_max):
+    out = [None for _ in range(codelength_max)]
     start_i = 0
     # assume that dict (which is sorted by insertion order) has ascending keys
     for ch, code in codes.items():
-        count = 2 ** (depth - len(code))
+        assert codelength_max >= len(code)
+        count = 2 ** (codelength_max - len(code))
         end_i = start_i + count
         out[start_i:end_i] = [(ch, len(code)) for _ in range(count)]
         start_i = end_i
     return out
 
-def to_tablestring(table):
+def get_table_bytes(table):
     s = '\n'
     for tup in table:
         ch, count = tup
@@ -74,18 +79,25 @@ def encode(text, codes):
         bitstring += code
     nums = []
     for i in range(0, len(bitstring), 8):
-        bitstring_slice = bitstring[i:i+8]
+        bitstring_slice = bitstring[i : i + 8]
         nums.append(int(bitstring_slice, 2))
-    print(bitstring)
     return bytes(nums), len(bitstring)
 
-def write_bin(path, encoded, bitlength, tablestring):
-    # encoded and tablestring are both in byte form already
-    f = open(path, 'wb') # wb necessary to write bytes, have to put .encode(blah) everywhere
-    f.write(f'{bitlength}\n'.encode('ascii'))
-    f.write(encoded)
-    f.write(tablestring)
+def write(path, encoded_bitlength, encoded_bytes, table_bytes):
+    f = open(path, 'xb') # wb necessary to write bytes, have to put .encode(blah) everywhere
+    f.write(f'{encoded_bitlength}\n'.encode('ascii'))
+    f.write(encoded_bytes)
+    f.write(table_bytes)
     f.close()
 
-encoded, bitlength = encode('adcaaaaaaaaaaaaaaadddddddddddddccccccccccccccc', codes)
-write_bin('test.bin', encoded, bitlength, to_tablestring(to_table(codes, 3)))
+def main():
+    assert len(sys.argv) == 3
+    path_in = sys.argv[1]
+    path_out = sys.argv[2]
+    text = read(path_in)
+    codes, codelength_max = codes_from_tree(huff_tree(charcount(text)))
+    table_bytes = get_table_bytes(table_from_codes(codes, codelength_max))
+    encoded_bytes, encoded_bitlength = encode(text, codes)
+    write(path_out, encoded_bitlength, encoded_bytes, table_bytes)
+
+main()
