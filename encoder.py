@@ -1,15 +1,53 @@
-# f = open('test.bin', 'wb')
-# f.write(bytes([0, 33, 255])) # f is now 0021ff (in hex). list elements must be between 0, 255 (inclusive)
-# f.close()
-# f = open('test.bin', 'rb')
-# print(f.read(-1))
-
-# s = '101011'
-# print(int(s, 2))
-
-# %%
+import queue
 
 codes = {'d': '0', 'c': '100', 'a': '101', 'b': '11'} # convert to array with tuples ('a', 3), ('b', 2), ('c', 3), ('d', 1)
+
+class Node:
+    def __init__(self, ch, count, left, right):
+        self.ch = ch
+        self.count = count
+        self.left = left
+        self.right = right
+    def __lt__(self, other):
+        return self.count < other.count
+
+def to_string(path):
+    f = open(path, 'r')
+    return f.read(-1)
+
+def charcount(string):
+    counts = dict()
+    for ch in string:
+        if ch in counts:
+            counts[ch] += 1
+        else:
+            counts[ch] = 1
+    return counts
+
+def to_tree(charcount):
+    pq = queue.PriorityQueue()
+    nodecount = len(charcount.items())
+    for ch, count in charcount.items():
+        pq.put(Node(ch, count, None, None))
+    for _ in range(nodecount - 1):
+        node_a = pq.get()
+        node_b = pq.get()
+        node_combined = Node(node_a.ch + node_b.ch, node_a.count + node_b.count, node_a, node_b)
+        pq.put(node_combined)
+    return pq.get()
+
+def to_codes(root):
+    codes = dict()
+    current_node = root
+    current_code = ''
+    def fill_codes(node, code):
+        if node:
+            if len(node.ch) == 1:
+                codes[node.ch] = code
+            fill_codes(node.left, code + '0')
+            fill_codes(node.right, code + '1')
+    fill_codes(current_node, current_code)
+    return codes
 
 def to_table(codes, depth):
     out = [None for _ in range(depth)]
@@ -51,5 +89,3 @@ def write_bin(path, encoded, bitlength, tablestring):
 
 encoded, bitlength = encode('adcaaaaaaaaaaaaaaadddddddddddddccccccccccccccc', codes)
 write_bin('test.bin', encoded, bitlength, to_tablestring(to_table(codes, 3)))
-
-# %%

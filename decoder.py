@@ -33,6 +33,7 @@ def encoded_to_bitstring(encoded, bitlength):
         else:
             s = '0' * (bitlength_last - len(s)) + s
         bitstring += s
+    assert len(bitstring) == bitlength
     return bitstring
 
 def tablestring_to_table(tablestring):
