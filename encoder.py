@@ -2,12 +2,11 @@ import queue
 import sys
 
 class Node:
-    def __init__(self, ch, count, height, left, right):
+    def __init__(self, ch, count, left, right):
         self.ch = ch
         self.count = count
         self.left = left
         self.right = right
-        self.height = height
     def __lt__(self, other):
         return self.count < other.count
 
@@ -30,11 +29,11 @@ def huff_tree(charcount):
     pq = queue.PriorityQueue()
     nodecount = len(charcount.items())
     for ch, count in charcount.items():
-        pq.put(Node(ch, count, 0, None, None))
+        pq.put(Node(ch, count, None, None))
     for _ in range(nodecount - 1):
         node_a = pq.get()
         node_b = pq.get()
-        node_combined = Node(node_a.ch + node_b.ch, node_a.count + node_b.count, max(node_a.height, node_b.height) + 1, node_a, node_b)
+        node_combined = Node(node_a.ch + node_b.ch, node_a.count + node_b.count, node_a, node_b)
         pq.put(node_combined)
     return pq.get()
 
@@ -49,25 +48,12 @@ def codes_from_tree(root):
             fill_codes(node.left, code + '0')
             fill_codes(node.right, code + '1')
     fill_codes(current_node, current_code)
-    return codes, root.height
+    return codes
 
-def table_from_codes(codes, codelength_max):
-    out = [None for _ in range(codelength_max)]
-    start_i = 0
-    # assume that dict (which is sorted by insertion order) has ascending keys
-    for ch, code in codes.items():
-        assert codelength_max >= len(code)
-        count = 2 ** (codelength_max - len(code))
-        end_i = start_i + count
-        out[start_i:end_i] = [(ch, len(code)) for _ in range(count)]
-        start_i = end_i
-    return out
-
-def get_table_bytes(table):
+def get_codes_bytes(codes):
     s = '\n'
-    for tup in table:
-        ch, count = tup
-        s += ch + str(count) + '\n'
+    for key, value in codes.items():
+        s += key + ' ' + value + '\n'
     return s.encode('ascii')
 
 def encode(text, codes):
@@ -81,11 +67,12 @@ def encode(text, codes):
         nums.append(int(bitstring_slice, 2))
     return bytes(nums), len(bitstring)
 
-def write(path, encoded_bitlength, encoded_bytes, table_bytes):
+def write(path, encoded_bitlength, encoded_bytes, codes_bytes):
     f = open(path, 'wb') # wb necessary to write bytes, have to put .encode(blah) everywhere
+    f.write('LosslessTextComp\n'.encode('ascii'))
     f.write(f'{encoded_bitlength}\n'.encode('ascii'))
     f.write(encoded_bytes)
-    f.write(table_bytes)
+    f.write(codes_bytes)
     f.close()
 
 def main():
@@ -93,9 +80,9 @@ def main():
     path_in = sys.argv[1]
     path_out = sys.argv[2]
     text = read(path_in)
-    codes, codelength_max = codes_from_tree(huff_tree(charcount(text)))
-    table_bytes = get_table_bytes(table_from_codes(codes, codelength_max))
+    codes = codes_from_tree(huff_tree(charcount(text)))
+    codes_bytes = get_codes_bytes(codes)
     encoded_bytes, encoded_bitlength = encode(text, codes)
-    write(path_out, encoded_bitlength, encoded_bytes, table_bytes)
+    write(path_out, encoded_bitlength, encoded_bytes, codes_bytes)
 
 main()

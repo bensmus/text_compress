@@ -1,28 +1,43 @@
 import math
 
-def get_metadata(path):
-    f = open(path, 'r')
-    s = ''
-    start_encoded = 1 # take newline byte into account
-    while (ch := f.read(1)) != '\n':
-        s += ch
-        start_encoded += 1
-    bitlength = int(s)
-    f.close()
-    return bitlength, start_encoded
+# def get_metadata(path):
+#     f = open(path, 'r')
+#     s = ''
+#     start_encoded = 0
+#     while (ch := f.read(1)) != '\n':
+#         s += ch
+#         start_encoded += 1
+#     bitlength = int(s)
+#     f.close()
+#     return bitlength, start_encoded + 1 # take newline byte into account
 
 # print(get_metadata('test.bin'))
 
-def split(path):
-    bitlength, start_encoded = get_metadata(path)
+def read(path):
+    # bitlength, start_encoded = get_metadata(path)
     f = open(path, 'rb')
-    f.read(start_encoded)
-    encoded = f.read(math.ceil(bitlength / 8))
-    f.read(1) # there's a newline before the table
-    table = f.read(-1)
-    return encoded, bitlength, table
+    header = f.readline().decode('ascii')
+    assert header == 'LosslessTextComp\n'
+    
+    bitlength = int(f.readline().decode('ascii'))
 
-def encoded_to_bitstring(encoded, bitlength):
+    # read the encoded text (sequence of huffman codes)
+    encoded_bytes = f.read(math.ceil(bitlength / 8))
+    bitstring = encoded_bytes_to_bitstring(encoded_bytes, bitlength)
+
+    # get the codes dictionary
+    f.read(1) # newline before dictionary
+    codes = {}
+    codelength_max = -1
+    while (line := f.readline().decode('ascii')):
+        ch = line[0]
+        code = line[2:]
+        codes[ch] = code
+        codelength_max = max(codelength_max, len(code))
+    f.close()
+    return bitstring, bitlength, codes, codelength_max
+
+def encoded_bytes_to_bitstring(encoded, bitlength):
     bitstring = ''
     bitlength_last = bitlength - (bitlength // 8) * 8
     for i, b in enumerate(encoded):
@@ -36,9 +51,18 @@ def encoded_to_bitstring(encoded, bitlength):
     assert len(bitstring) == bitlength
     return bitstring
 
-def tablestring_to_table(tablestring):
-    s_to_tup = lambda s: (s[0], int(s[1]))
-    return list(map(s_to_tup, tablestring.split('\n')[:-1]))
+def table_from_codes(codes, codelength_max):
+    out = [None for _ in range(codelength_max)]
+    start_i = 0
+    # assume that dict (which is sorted by insertion order) has ascending keys, this allows index into table to be correct
+    breakpoint()
+    for ch, code in codes.items():
+        assert codelength_max >= len(code)
+        count = 2 ** (codelength_max - len(code))
+        end_i = start_i + count
+        out[start_i:end_i] = [(ch, len(code)) for _ in range(count)]
+        start_i = end_i
+    return out
 
 def decode(bitstring, table):
     read_size = int(math.log2(len(table)))
@@ -51,10 +75,9 @@ def decode(bitstring, table):
         bitstring_index += tup[1]
     return text
 
-encoded, bitlength, tablebytes = split('test.bin')
-table = tablestring_to_table(tablebytes.decode('ascii'))
+bitstring, bitlength, codes, codelength_max = read('lorem.bin')
+table = table_from_codes(codes, codelength_max)
 print(table)
-bitstring = encoded_to_bitstring(encoded, bitlength)
 print(bitstring)
 text = decode(bitstring, table)
 print(text)
